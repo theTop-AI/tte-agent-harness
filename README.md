@@ -189,5 +189,6 @@ limits: [docs/security.md](docs/security.md).
 
 ## License
 
-Private, proprietary repository of theTop-AI. No license has been chosen; all rights reserved
-until the owners decide otherwise.
+Published by theTop-AI without a license. The code is readable, but no license has been chosen,
+so all rights are reserved: no permission to use, copy, modify or distribute it is granted until
+the owners choose a license.

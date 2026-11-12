@@ -99,5 +99,5 @@ Details: [orchestration.md](orchestration.md). Repositories and specs:
 - **Renamed review skills.** `code-review` and `security-review` are bundled Claude Code skills;
   the harness's are `tte-code-review` and `tte-security-review`, and the validator rejects any
   reserved name.
-- **No license chosen.** This is a private company repository; it carries no LICENSE file until
-  the owners choose one. All rights reserved.
+- **No license chosen.** The repository is public but carries no LICENSE file until the owners
+  choose one, so all rights are reserved.

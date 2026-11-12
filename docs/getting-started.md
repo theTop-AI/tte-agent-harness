@@ -6,10 +6,17 @@ runs as that user; only the optional system packages in step 1 need `sudo`.
 The primary target is the AWS devbox `tte-devbox-vlad` (Ubuntu 24.04, user `ubuntu`, SSH through
 AWS Systems Manager). The same commands work on macOS for local use.
 
-> **Verification status.** The commands below were run on macOS (2026-11-12). The devbox was not
-> reachable from the session that wrote this guide (expired AWS SSO token), so every step marked
-> *unverified on the devbox* is the documented procedure, not an observed run. `scripts/doctor.sh`
-> tells you on the host what holds and what does not.
+> **Verification status (2026-11-12).** Steps 2–7 were run on macOS and on `tte-devbox-vlad`:
+> clone at a commit, validate, the 82 tests and the example simulation (system `python3` 3.12.3
+> with the preinstalled PyYAML 6.0.1), `install.sh --dry-run` (nothing written), the install
+> (30 files for Claude Code 2.1.322; Codex is not installed there), a second install (30
+> unchanged), `--with-orca-skills` (Orca's installer added `orca-cli`; `orchestration` was already
+> there), and `doctor.sh` (all OK but the optional Codex and the not-yet-cloned tte-infra and
+> tte-lab). Claude Code on the devbox lists the 8 roles as subagents and the harness skills.
+> Steps still marked *unverified on the devbox* were not exercised there. On the devbox
+> `claude` lives in `~/.local/bin` and Orca's CLI in `~/.orca/cli/bin/orca-ide`: both are on
+> the `PATH` of interactive and Orca terminals, and the harness finds `orca-ide` there without
+> `PATH` anyway.
 
 ## 0. Reach the devbox
 
@@ -116,12 +123,13 @@ scripts/install.sh --with-orca-skills
 ```
 
 This runs `orca skills install --skill orca-cli --skill orchestration` through the CLI the official
-skills resolve. Run it inside an Orca terminal because on Linux a bare `orca` outside Orca is
-usually `/usr/bin/orca`, the GNOME screen reader; the harness refuses that binary and says so.
-*Unverified on the devbox:* how the Orca CLI is exposed in that terminal. The harness accepts
-`$ORCA_CLI_COMMAND`, then `orca-ide`, then an `orca` that is not `/usr/bin/orca` while
-`ORCA_TERMINAL_HANDLE` or `ORCA_WORKTREE_ID` is set; `scripts/doctor.sh` prints which one it found. Connecting Orca to the devbox and turning on
-orchestration: [orchestration.md](orchestration.md).
+skills resolve. On Linux a bare `orca` outside Orca is usually `/usr/bin/orca`, the GNOME screen
+reader; the harness never runs that binary. It accepts `$ORCA_CLI_COMMAND`, then `orca-ide` (on
+`PATH`, in `$ORCA_CLI_BIN_DIR`, or in `~/.orca/cli/bin`, where Orca's managed server installs it),
+then an `orca` that is not `/usr/bin/orca` while `ORCA_TERMINAL_HANDLE` or `ORCA_WORKTREE_ID` is
+set. On the devbox it finds `~/.orca/cli/bin/orca-ide`, so this step works from a plain SSH shell
+too (verified 2026-11-12); `scripts/doctor.sh` prints which CLI it used. Connecting Orca to the
+devbox and turning on orchestration: [orchestration.md](orchestration.md).
 
 ## 6. Optional: Claude Code permission rules
 

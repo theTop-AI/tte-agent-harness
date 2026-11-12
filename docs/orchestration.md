@@ -111,6 +111,8 @@ The full sequence, with the Users Management example: [examples/users-management
 4. **Create the DAG in Orca**: `tte-harness orca commands --run-dir <run>` shows the calls;
    `tte-harness orca create --run-dir <run>` makes them: one Run, one Task per plan task with its
    brief as the spec and `--deps` as Orca ids, and a decision gate on every task with `approval:`.
+   Run it from the coordinator's own Orca terminal or chat: Orca binds the Run to the session
+   that creates it and refuses a caller it cannot identify (or pass `--from <terminal handle>`).
 5. **Coordinate**: launch the coordinator with
    [adapters/orca/coordinator-prompt.md](../adapters/orca/coordinator-prompt.md). It starts a
    worker per ready Task (`orca orchestration worker-start --task ... --worktree new-top-level
@@ -170,12 +172,13 @@ starts only when the coordinator has seen its dependencies' evidence pass.
 
 ## Verified, simulated, pending
 
-| Item | State |
+| Item | State (2026-11-12) |
 |---|---|
 | CLI resolution, command construction, receipt parsing, lifecycle mapping | verified by tests against a fake CLI that reproduces 1.4.256's `--json --full` receipts |
-| `orca skills get`, `skills list`, `status`, the command schema | verified live on the Mac (runtime not running) |
-| Run/Task/gate creation against a live Orca | pending: needs Orca open with orchestration enabled |
-| SSH host with the SSM `ProxyCommand`, repo registration, worktree base path | pending: the devbox was unreachable from the build session (expired AWS SSO token) |
+| Run, Tasks with `--deps`, decision gate, read back by `task-list`/`gate-list` | **verified live** on the Mac (Orca 1.4.256): `tte-harness orca create` inside an Orca terminal made Run `run_839ab01ec937` with 2 Tasks and 1 gate; each Task's spec is its full brief; Orca set the gated Task to `blocked`, and `tte-harness status` read back READY / NEEDS_APPROVAL |
+| Caller identity | **observed live**: outside an Orca terminal, orchestration refuses with `no_active_sender_terminal`; run it from the coordinator's Orca session or pass `--from <own terminal handle>` |
+| The devbox as an Orca SSH host | **verified**: Orca's managed server is installed (`~/.orca`, `~/.orca-remote`), its CLI is `~/.orca/cli/bin/orca-ide` (1.4.255), the runtime is ready and orchestration answers from the host, and Orca already keeps worktrees in `/home/ubuntu/orca/workspaces/` |
+| Starting a real worker on the devbox (`worker-start`) | pending: needs a real task; the first feature run is the test |
 | `--on` to an SSH host's managed server | unverified; not used |
 
 ## Future

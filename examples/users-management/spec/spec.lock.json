@@ -1,5 +1,5 @@
 {
-  "approved_at": "2026-11-12T09:06:05+00:00",
+  "approved_at": "2026-11-12T09:15:23+00:00",
   "approved_by": "example only - not a real approval",
   "digest": "sha256:a5d51fc6f1f1bb8e895fe72380efd00f381ed40c5f7749d6e9bb7c69bb0e1941",
   "feature": "users-management",
@@ -9,10 +9,10 @@
     "requirements.md": "sha256:423aba7f91995722c86123a6ad226c08632dc0d1293d59ecd3a1cb732c4ff3e5",
     "test-plan.md": "sha256:ea2eac91a79ede127460dbf40ff18a72af248b60e5f7516e25431ede89efc567"
   },
-  "note": "",
+  "note": "Illustrative example; no person approved this spec.",
   "schema": 1,
   "source": {
-    "commit": null,
+    "commit": "61b311785ab27a8ca2cc798019b74ed688f5f053",
     "remote": null
   }
 }

@@ -1,0 +1,83 @@
+# Fix a defect: reproduce it with a failing test first, then fix it, review, integrate, and hand
+# the pull request to a person. A plan keeps the stages of the affected side (backend, frontend
+# or both) and drops the others.
+schema: 1
+name: bug-fixing
+description: >-
+  Reproduce the defect with a failing test written by the QA role of the affected repository, fix
+  it with the developer role, review it independently, open the pull request, and report the root
+  cause; a person approves the fix scope and merges.
+
+stages:
+  - id: triage
+    title: Confirm the defect, the expected behaviour and the affected repository
+    role: solution-architect
+    skills: [requirements-analysis]
+    depends_on: []
+    outputs: [spec/requirements.md]
+
+  - id: scope-approval
+    title: A person approves the bug analysis and the fix scope
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [triage]
+    approval: Approve the expected behaviour and the fix scope described in the bug analysis?
+    outputs: [spec/spec.lock.json]
+
+  - id: reproduce-backend
+    title: Failing backend test that reproduces the defect
+    role: backend-qa
+    skills: [backend-testing]
+    depends_on: [scope-approval]
+    per_repository: true
+    gates: [clean-commit, spec-pinned, no-contract-change, no-secrets]
+    outputs: [a test that fails on the base branch for the reported reason]
+
+  - id: reproduce-frontend
+    title: Failing frontend test that reproduces the defect
+    role: frontend-qa
+    skills: [frontend-testing]
+    depends_on: [scope-approval]
+    per_repository: true
+    gates: [clean-commit, spec-pinned, no-contract-change, no-secrets]
+    outputs: [a test that fails on the base branch for the reported reason]
+
+  - id: fix-backend
+    title: Backend fix that makes the reproducing test pass
+    role: backend-developer
+    skills: [python-development]
+    depends_on: [reproduce-backend]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: fix-frontend
+    title: Frontend fix that makes the reproducing test pass
+    role: frontend-developer
+    skills: [react-development]
+    depends_on: [reproduce-frontend]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: review
+    title: Independent review of the fix and its test
+    role: code-reviewer
+    skills: [tte-code-review, tte-security-review]
+    depends_on: [fix-backend, fix-frontend]
+    per_repository: true
+    gates: [scope-matches-task, security-reviewed, tests-cover-criteria]
+
+  - id: integration
+    title: Open the pull request and check CI
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: [review]
+    approval: Open the pull request(s) for the reviewed fix?
+    gates: [pr-created, ci-green]
+
+  - id: report
+    title: Root cause, fix and evidence for the person who merges
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [integration]
+    gates: [acceptance-verified, risks-documented, human-merge-approval]
+    outputs: [delivery-report.md with the root cause]

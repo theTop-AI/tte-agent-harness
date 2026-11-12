@@ -1,0 +1,163 @@
+# Users management: the task DAG for an illustrative cross-repository feature.
+# Validate: bin/tte-harness plan examples/users-management/plan.yaml --check
+schema: 1
+feature: users-management
+title: Users management
+workflow: feature-development
+spec: spec
+
+tasks:
+  # --- wave 1: four tasks in parallel, two repositories ------------------------------------
+  - id: be-users-api
+    title: GET /api/v1/users in tte-engine
+    role: backend-developer
+    repo: tte-engine
+    depends_on: []
+    inputs:
+      - api-contract.md#conventions
+      - api-contract.md#endpoint-list-users
+      - architecture.md#components
+      - architecture.md#security-and-isolation
+      - requirements.md#non-functional-requirements
+    outputs:
+      - router server/api/users.py registered in ROUTERS, behind require_admin
+      - tenant-scoped keyset query with search, role and status filters, two sort orders
+      - openapi.json regenerated with the new operation (the approved contract change)
+      - unit tests for cursor encode/decode and query building
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets,
+            security-reviewed, review-pass]
+    done_when:
+      - every row of the contract's Errors table is produced by the route
+      - scripts/export_openapi.py --check passes with the regenerated openapi.json
+      - no query reads without org_id
+    review_by: review-engine
+    contract_change: approved
+    status: PENDING
+    blockers: []
+
+  - id: be-users-tests
+    title: API and isolation tests for /api/v1/users, written test-first
+    role: backend-qa
+    repo: tte-engine
+    depends_on: []
+    inputs:
+      - api-contract.md#endpoint-list-users
+      - test-plan.md#backend-scenarios
+      - test-plan.md#test-first-order
+      - requirements.md#acceptance-criteria
+    outputs:
+      - pytest API tests B-1 to B-10 against the contract, using the repository's DB fixtures
+      - a coverage note mapping each AC to its tests
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets,
+            tests-cover-criteria, review-pass]
+    done_when:
+      - every backend scenario of the test plan exists as a test
+      - before be-users-api lands the new tests fail only with 404 route-not-found; after, all pass
+    review_by: review-engine
+    status: PENDING
+    blockers: []
+
+  - id: fe-users-screen
+    title: Users screen in tte-frontend against the approved contract (mock engine)
+    role: frontend-developer
+    repo: tte-frontend
+    depends_on: []
+    inputs:
+      - api-contract.md#endpoint-list-users
+      - architecture.md#components
+      - architecture.md#decisions
+      - requirements.md#functional-requirements
+      - requirements.md#acceptance-criteria
+    outputs:
+      - features/users (api.ts, screens, components, index.ts) and routes/_authed/_app/users.tsx
+      - a mock-engine fixture for the operation, built from the approved contract
+      - loading, empty, error and freshness states; keyboard path
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets,
+            security-reviewed, review-pass]
+    done_when:
+      - the screen meets AC-1 to AC-7 against the mock engine
+      - the pinned contract (packages/api-engine/contract/) is NOT changed; integration bumps it
+    review_by: review-frontend
+    status: PENDING
+    blockers: []
+
+  - id: fe-users-tests
+    title: Component and e2e tests for the Users screen, written test-first
+    role: frontend-qa
+    repo: tte-frontend
+    depends_on: []
+    inputs:
+      - test-plan.md#frontend-scenarios
+      - test-plan.md#test-first-order
+      - requirements.md#acceptance-criteria
+    outputs:
+      - Vitest component tests F-2, F-5, F-7 and Playwright specs F-1, F-3, F-4, F-6, F-8
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets,
+            tests-cover-criteria, review-pass]
+    done_when:
+      - every frontend scenario of the test plan exists as a test
+      - each new e2e spec runs against the mock engine, never a live engine
+    review_by: review-frontend
+    status: PENDING
+    blockers: []
+
+  # --- wave 2: independent review, one per repository --------------------------------------
+  - id: review-engine
+    title: Independent code and security review of the tte-engine branches
+    role: code-reviewer
+    repo: tte-engine
+    depends_on: [be-users-api, be-users-tests]
+    inputs:
+      - api-contract.md#endpoint-list-users
+      - architecture.md#security-and-isolation
+      - test-plan.md#backend-scenarios
+    outputs:
+      - a findings file per reviewed task, recorded with tte-harness evidence review
+    gates: []
+    done_when:
+      - verdicts recorded for be-users-api and be-users-tests on their validated commits
+      - zero unresolved critical findings, or the tasks are sent back
+    status: PENDING
+    blockers: []
+
+  - id: review-frontend
+    title: Independent code and accessibility review of the tte-frontend branches
+    role: code-reviewer
+    repo: tte-frontend
+    depends_on: [fe-users-screen, fe-users-tests]
+    inputs:
+      - api-contract.md#endpoint-list-users
+      - requirements.md#non-functional-requirements
+      - test-plan.md#frontend-scenarios
+    outputs:
+      - a findings file per reviewed task, recorded with tte-harness evidence review
+    gates: []
+    done_when:
+      - verdicts recorded for fe-users-screen and fe-users-tests on their validated commits
+    status: PENDING
+    blockers: []
+
+  # --- wave 3: integration, behind a decision gate -----------------------------------------
+  - id: integration
+    title: Integrate FE + BE, validate together, open the pull requests
+    role: integration-engineer
+    repo: tte-frontend
+    depends_on: [review-engine, review-frontend]
+    inputs:
+      - architecture.md#delivery-shape
+      - api-contract.md#compatibility
+      - requirements.md#definition-of-done
+    outputs:
+      - one pull request per repository, engine first; the frontend PR moves the pinned contract
+        to the engine release that carries the operation
+      - the frontend e2e suite run against the real engine build, not only the mock
+      - pull requests and their checks recorded with tte-harness evidence pr
+    gates: [pr-created, ci-green, human-merge-approval]
+    done_when:
+      - both pull requests are open with every check green on their head commits
+      - the delivery report lists the merge order and every open finding
+    approval: >-
+      Open the pull requests for users-management in tte-engine and tte-frontend (engine first),
+      from the reviewed branches?
+    status: PENDING
+    blockers: []

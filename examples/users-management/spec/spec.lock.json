@@ -1,0 +1,18 @@
+{
+  "approved_at": "2026-11-12T09:06:05+00:00",
+  "approved_by": "example only - not a real approval",
+  "digest": "sha256:a5d51fc6f1f1bb8e895fe72380efd00f381ed40c5f7749d6e9bb7c69bb0e1941",
+  "feature": "users-management",
+  "files": {
+    "api-contract.md": "sha256:4f091dc6aeee9595a0774b3131b0de0db5d7f462fdcbd80bdf9ca978800be357",
+    "architecture.md": "sha256:d1bb619a823a34728933b61b6d9c39eb12632295a01953f3d69fdb75c79c43ad",
+    "requirements.md": "sha256:423aba7f91995722c86123a6ad226c08632dc0d1293d59ecd3a1cb732c4ff3e5",
+    "test-plan.md": "sha256:ea2eac91a79ede127460dbf40ff18a72af248b60e5f7516e25431ede89efc567"
+  },
+  "note": "",
+  "schema": 1,
+  "source": {
+    "commit": null,
+    "remote": null
+  }
+}

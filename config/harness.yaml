@@ -1,0 +1,123 @@
+# Harness policy: read by `tte-harness validate`, `install`, `plan` and `evidence`.
+# Paths that depend on the host (config directories, state) are resolved in code from the
+# environment (CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_STATE_HOME), never written here.
+schema: 1
+
+harness:
+  name: tte-agent-harness
+  github: theTop-AI/tte-agent-harness
+
+# Names a harness skill or agent may not take, because something else already owns them in the
+# same discovery folder. A clash either shadows the other definition or is shadowed by it.
+reserved:
+  skills:
+    # Bundled with Claude Code 2.1.x (seen in the session skill list, 2026-11-12).
+    - code-review
+    - security-review
+    - simplify
+    - init
+    - loop
+    - schedule
+    - run
+    - update-config
+    - keybindings-help
+    - fewer-permission-prompts
+    - claude-api
+    # Installed by tte-workflows setup.sh into the same folders (~/.claude/skills, ~/.agents/skills).
+    - implement
+    - make-pr
+    - memory-run
+    - plan-ticket
+    - publish-plan
+    - req
+    - review-plan
+    - scope-check
+    # Installed by `orca skills install` into ~/.agents/skills and linked per agent.
+    - orca-cli
+    - orchestration
+    - orca-computer-use
+  agents:
+    # Claude Code built-in subagents.
+    - general-purpose
+    - explore
+    - plan
+    - statusline-setup
+    - claude-code-guide
+
+# Access levels a role may declare. `tools` are the Claude Code tools the rendered subagent gets;
+# `codex_sandbox` is the Codex sandbox_mode of the rendered custom agent.
+access:
+  read-only:
+    description: Reads code and runs read-only commands; never edits files.
+    tools: [Read, Grep, Glob, Bash]
+    disallowed_tools: [Edit, Write, NotebookEdit]
+    codex_sandbox: read-only
+  spec-write:
+    description: Writes specification documents in the feature's spec folder only.
+    tools: [Read, Grep, Glob, Bash, Edit, Write]
+    disallowed_tools: [NotebookEdit]
+    codex_sandbox: workspace-write
+  repo-write:
+    description: Edits code and tests in the one repository worktree it was given.
+    tools: [Read, Grep, Glob, Bash, Edit, Write]
+    disallowed_tools: []
+    codex_sandbox: workspace-write
+  coordinate:
+    description: Reads plans and drives Orca; edits only the run ledger through tte-harness.
+    tools: [Read, Grep, Glob, Bash]
+    disallowed_tools: [Edit, Write, NotebookEdit]
+    codex_sandbox: workspace-write
+
+# The task lifecycle the harness talks about, and how each state is observed in Orca 1.4.x.
+# Orca task statuses (orca orchestration task-update --help): pending, ready, dispatched,
+# completed, failed, blocked. REVIEW and VALIDATING are not Orca statuses; they are derived.
+states:
+  PENDING:
+    orca_status: pending
+    meaning: Waiting for its dependencies.
+  READY:
+    orca_status: ready
+    meaning: Dependencies completed with evidence; the coordinator may start a worker.
+  RUNNING:
+    orca_status: dispatched
+    meaning: A worker holds the task.
+  VALIDATING:
+    orca_status: completed
+    meaning: >-
+      The worker reported done, but the task's development gates do not pass in
+      `tte-harness evidence check` yet. Dependents wait; the coordinator sends the worker back.
+  REVIEW:
+    orca_status: completed
+    meaning: >-
+      Development gates pass; the review task (review_by) or a review-stage gate is not done.
+  COMPLETED:
+    orca_status: completed
+    meaning: Orca completed it, its review task completed, and every non-human gate passes.
+  BLOCKED:
+    orca_status: blocked
+    meaning: Waiting on something outside the DAG (an answer, an external fix).
+  NEEDS_APPROVAL:
+    orca_status: blocked
+    meaning: A decision gate on the task is pending (orchestration gate-create).
+  FAILED:
+    orca_status: failed
+    meaning: The worker reported failure or the evidence check failed.
+  CANCELLED:
+    orca_status: failed
+    meaning: Stopped on purpose; Orca records it as failed with result "cancelled".
+
+# Where feature runs keep their ledger: pinned spec copy, briefs, evidence, Orca id map.
+runs:
+  root: "${XDG_STATE_HOME:-~/.local/state}/tte-agent-harness/runs"
+
+# External skills: nothing is fetched automatically. An entry is added only after the
+# skill-management review (skills/skill-management/SKILL.md) and pins an exact commit.
+external_skills:
+  - name: orca-cli
+    source: bundled with the Orca CLI (orca skills install --skill orca-cli)
+    pinned_by: the Orca build on the host (orca skills update)
+    status: approved
+  - name: orchestration
+    source: bundled with the Orca CLI (orca skills install --skill orchestration)
+    pinned_by: the Orca build on the host (orca skills update)
+    status: approved

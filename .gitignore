@@ -1,0 +1,21 @@
+# Per-host repository paths (copy config/repositories.example.yaml)
+config/repositories.yaml
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Local runs and scratch output
+.runs/
+*.tte-harness.tmp
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+
+# Personal Claude Code settings
+.claude/settings.local.json

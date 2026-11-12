@@ -1,0 +1,18 @@
+# Reviewed starting point for ~/.codex/config.toml on a host that runs Codex workers.
+# The harness never writes this file; copy the parts you want by hand.
+# Keys and values from learn.chatgpt.com/docs/config-file/config-reference (2026-11).
+
+# A worker edits only its own worktree; anything else asks a person.
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+# Off by default. Turn on only if Codex workers must run validation steps that download
+# dependencies (pnpm install, playwright install, uv sync). This is a conscious trade-off:
+# with network on, a prompt-injected worker can reach the internet from inside its sandbox.
+network_access = false
+
+# A harness skill can be switched off for Codex without uninstalling it:
+# [[skills.config]]
+# name = "skill-management"
+# enabled = false

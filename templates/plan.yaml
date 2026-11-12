@@ -1,0 +1,38 @@
+# A feature plan: the task DAG the coordinator turns into an Orca Run.
+# Validate with `tte-harness plan <this file> --check`; full schema in docs/orchestration.md.
+schema: 1
+feature: my-feature                 # lowercase-hyphenated id, also the run folder name
+title: My feature
+workflow: feature-development       # a folder under workflows/
+spec: spec                          # folder (relative to this file) with the approved spec + spec.lock.json
+
+tasks:
+  - id: be-api                      # unique, lowercase-hyphenated
+    title: Implement the API
+    role: backend-developer         # an agent under agents/, allowed in the repo (repositories: roles)
+    repo: tte-engine                # a key of config/repositories*.yaml
+    depends_on: []                  # task ids; the DAG must be acyclic
+    inputs:                         # spec files, optionally narrowed to one heading: file.md#anchor
+      - api-contract.md
+    outputs:
+      - endpoint implemented with unit and API tests
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+    done_when:
+      - every AC the task carries is covered by a passing test
+    review_by: review-be            # needed when gates include review-pass
+    contract_change: approved       # only when the task implements the approved contract change
+    status: PENDING                 # a lifecycle state from config/harness.yaml
+    blockers: []
+
+  - id: review-be
+    title: Independent review of be-api
+    role: code-reviewer
+    repo: tte-engine
+    depends_on: [be-api]
+    inputs: [api-contract.md]
+    outputs: [review verdict recorded with tte-harness evidence review]
+    gates: []
+    done_when: [verdict recorded for the validated commit]
+    status: PENDING
+    blockers: []
+    # approval: "Question for a person"   # opens an Orca decision gate on this task (NEEDS_APPROVAL)

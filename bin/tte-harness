@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Run the tte-harness CLI from this checkout with a Python that has PyYAML:
+#   1. $TTE_HARNESS_PYTHON, if set
+#   2. python3 on PATH, when it is 3.10+ and imports yaml (Ubuntu EC2 images ship python3-yaml)
+#   3. uv, with a pinned interpreter and PyYAML (macOS, CI)
+# Bash 3.2 compatible (macOS /bin/bash).
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -h "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+root="$(cd -P "$(dirname "$src")/.." && pwd)"
+export PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}"
+
+# `tte-harness --python <args>` runs that interpreter with <args> instead of the CLI, so the test
+# suite runs under exactly the Python the CLI would use.
+if [ "${1:-}" = "--python" ]; then
+  shift
+  set -- "$@"
+else
+  set -- -m tte_harness "$@"
+fi
+
+check='import sys, yaml; sys.exit(0 if sys.version_info >= (3, 10) else 1)'
+for py in "${TTE_HARNESS_PYTHON:-}" python3; do
+  [ -n "$py" ] || continue
+  if command -v "$py" >/dev/null 2>&1 && "$py" -c "$check" >/dev/null 2>&1; then
+    exec "$py" "$@"
+  fi
+done
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --quiet --no-project --python 3.12 --with pyyaml==6.0.2 python "$@"
+fi
+
+cat >&2 <<'EOF'
+tte-harness needs Python 3.10+ with PyYAML, and found neither that nor uv.
+  Ubuntu:  sudo apt-get install -y python3-yaml   (already present on EC2 Ubuntu images)
+  macOS:   brew install uv
+  or set TTE_HARNESS_PYTHON to an interpreter that has PyYAML.
+EOF
+exit 2

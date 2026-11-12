@@ -1,0 +1,93 @@
+# Feature development across one or more repositories. A feature's plan.yaml instantiates these
+# stages as concrete tasks (one per repository where a stage is per_repository).
+schema: 1
+name: feature-development
+description: >-
+  Specification first: requirements, architecture and a versioned API contract are approved by a
+  person and locked before any implementation; then backend, frontend and QA work runs in
+  parallel per repository, is integrated, independently reviewed, and handed to a person to merge.
+
+stages:
+  - id: requirements
+    title: Requirements and business context
+    role: solution-architect
+    skills: [requirements-analysis]
+    depends_on: []
+    outputs: [spec/requirements.md]
+
+  - id: architecture
+    title: Architecture and API contract
+    role: solution-architect
+    skills: [solution-architecture, api-design]
+    depends_on: [requirements]
+    outputs: [spec/architecture.md, spec/api-contract.md, spec/test-plan.md]
+
+  - id: decomposition
+    title: Task graph
+    role: solution-architect
+    skills: [task-decomposition]
+    depends_on: [architecture]
+    outputs: [plan.yaml]
+
+  - id: spec-approval
+    title: A person approves the spec and the plan
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [decomposition]
+    approval: Approve the requirements, architecture, API contract and task plan as written?
+    outputs: [spec/spec.lock.json]
+
+  - id: backend
+    title: Backend implementation
+    role: backend-developer
+    skills: [python-development, api-design]
+    depends_on: [spec-approval]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: backend-tests
+    title: Backend API and integration tests
+    role: backend-qa
+    skills: [backend-testing]
+    depends_on: [spec-approval]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: frontend
+    title: Frontend implementation
+    role: frontend-developer
+    skills: [react-development]
+    depends_on: [spec-approval]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: frontend-tests
+    title: Frontend component, integration and E2E tests
+    role: frontend-qa
+    skills: [frontend-testing]
+    depends_on: [spec-approval]
+    per_repository: true
+    gates: [repo-validate, clean-commit, spec-pinned, no-contract-change, no-secrets, review-pass]
+
+  - id: review
+    title: Independent code and security review, per repository
+    role: code-reviewer
+    skills: [tte-code-review, tte-security-review]
+    depends_on: [backend, backend-tests, frontend, frontend-tests]
+    per_repository: true
+    gates: [scope-matches-task, security-reviewed, tests-cover-criteria]
+
+  - id: integration
+    title: Integrate branches, validate FE + BE together, open pull requests
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: [review]
+    gates: [pr-created, ci-green]
+
+  - id: delivery
+    title: Delivery report and merge approval
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [integration]
+    approval: Merge the pull requests listed in the delivery report, in the order given?
+    gates: [acceptance-verified, risks-documented, human-merge-approval]

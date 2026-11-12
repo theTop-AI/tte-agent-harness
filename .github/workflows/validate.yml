@@ -1,0 +1,71 @@
+name: validate
+
+# Every pull request and every push to main, with no path filter: `validate` is meant to be the
+# required check, and a required check skipped by a path filter never reports.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Ubuntu is what the devbox runs (24.04, Python 3.12); 3.10 is the oldest Python the harness
+  # supports. macOS is where Orca IDE runs and where people try the harness locally.
+  checks:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, python: "3.12" }
+          - { os: ubuntu-24.04, python: "3.10" }
+          - { os: macos-latest, python: "3.12" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install PyYAML (the only dependency)
+        run: python -m pip install pyyaml==6.0.2
+      - name: Shell scripts
+        if: runner.os == 'Linux'
+        run: shellcheck bin/tte-harness scripts/*.sh examples/*/simulate.sh
+      - name: Validate the harness
+        run: bin/tte-harness validate --warnings
+        env:
+          TTE_HARNESS_PYTHON: python
+      - name: Tests (no live agents, no network)
+        run: bin/tte-harness --python -m unittest discover -s tests -t . -v
+        env:
+          TTE_HARNESS_PYTHON: python
+      - name: Example lifecycle simulation
+        run: examples/users-management/simulate.sh
+        env:
+          TTE_HARNESS_PYTHON: python
+      - name: Install into a scratch HOME, twice, then uninstall
+        env:
+          TTE_HARNESS_PYTHON: python
+        run: |
+          export HOME="$RUNNER_TEMP/home" && mkdir -p "$HOME"
+          bin/tte-harness install --providers claude,codex --dry-run
+          bin/tte-harness install --providers claude,codex
+          bin/tte-harness install --providers claude,codex | tee second.txt
+          # `! grep` would never fail under bash -e (errexit ignores negated commands).
+          if grep -E '^(create|update|conflict|force|remove) ' second.txt; then
+            echo "the second install changed files; it must be idempotent" >&2
+            exit 1
+          fi
+          bin/tte-harness uninstall
+          test -z "$(find "$HOME" -type f -not -path '*/backups/*')"
+
+  # The required check. `if: always()` plus the explicit result test: a job skipped because its
+  # needs failed reports as skipped, and a skipped required check would let a PR merge.
+  validate:
+    if: always()
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - run: test "${{ needs.checks.result }}" = success

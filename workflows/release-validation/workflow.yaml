@@ -1,0 +1,58 @@
+# Validate a release candidate across repositories without deploying anything: pinned heads,
+# matching contract versions, green validation and CI on the release heads, a security pass and a
+# report for the person who releases.
+schema: 1
+name: release-validation
+description: >-
+  Validate a release candidate across repositories without deploying: pin the heads, check the
+  frontend's vendored engine contract matches the engine release that serves it, run each
+  repository's validation sequence and read CI on the release pull requests, review security, and
+  hand a report to the person who merges the release and moves deployments by hand.
+
+stages:
+  - id: candidate
+    title: Pin the release candidate per repository (heads, versions, release pull requests)
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: []
+    outputs: [spec/release-candidate.md]
+
+  - id: contract-check
+    title: Contract versions agree across repositories
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: [candidate]
+    outputs: [contract comparison in the integration report]
+
+  - id: repo-validation
+    title: Each repository's validation sequence on its release head
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: [candidate]
+    per_repository: true
+    gates: [repo-validate, clean-commit, no-secrets]
+
+  - id: security-review
+    title: Security review of what changed since the last release
+    role: code-reviewer
+    skills: [tte-security-review]
+    depends_on: [candidate]
+    per_repository: true
+    gates: [security-reviewed]
+
+  - id: ci
+    title: CI on every release pull request head
+    role: integration-engineer
+    skills: [integration-validation]
+    depends_on: [contract-check, repo-validation]
+    per_repository: true
+    gates: [pr-created, ci-green]
+
+  - id: report
+    title: Release report and the person's go or no-go
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [ci, security-review]
+    approval: Release as reported? Merging the release pull requests and moving deployments stay with you.
+    gates: [acceptance-verified, risks-documented, human-merge-approval]
+    outputs: [delivery-report.md for the release]

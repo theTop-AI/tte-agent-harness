@@ -1,0 +1,90 @@
+# Reusable quality gates. A task in a feature plan lists the gates it must pass (`gates:`); a
+# workflow stage lists the gates its tasks inherit. `tte-harness evidence check` decides every
+# gate of kind `evidence` from recorded evidence; a `review` gate needs a recorded review verdict;
+# a `human` gate is an Orca decision gate a person resolves.
+#
+# Evidence is recorded by commands, not by an agent's own words:
+#   tte-harness evidence run     runs the repository's validation sequence, records each step
+#   tte-harness evidence review  records a reviewer's verdict and its critical-finding count
+#   tte-harness evidence pr      records the pull request and its checks from GitHub
+schema: 1
+
+gates:
+  # --- development -----------------------------------------------------------------------
+  repo-validate:
+    stage: development
+    kind: evidence
+    description: >-
+      Every step of the repository's validation sequence (its committed .claude/project.json
+      `validate` list) passed at the recorded commit. Covers lint, typecheck and tests where the
+      repository defines them; the harness never invents a command for a repository.
+  clean-commit:
+    stage: development
+    kind: evidence
+    description: The evidence was recorded on a committed tree, so it is about one commit.
+  spec-pinned:
+    stage: development
+    kind: evidence
+    description: >-
+      The evidence names the spec digest of the approved plan; work against another version of
+      the spec does not count.
+  no-contract-change:
+    stage: development
+    kind: evidence
+    description: >-
+      The branch changes no path listed under the repository's `contract_paths`, unless the task
+      declares `contract_change: approved` and names the approved contract version.
+  no-secrets:
+    stage: development
+    kind: evidence
+    description: The branch diff contains no credential-shaped string (tte_harness/secrets.py).
+  scope-matches-task:
+    stage: review
+    kind: review
+    description: >-
+      The diff does what the task brief asks and nothing else: no unrelated files, no work that
+      belongs to another task.
+
+  # --- review ----------------------------------------------------------------------------
+  review-pass:
+    stage: review
+    kind: evidence
+    description: >-
+      An independent reviewer (role code-reviewer, a different session from the implementer)
+      recorded a pass with zero unresolved critical findings for the recorded commit.
+  security-reviewed:
+    stage: review
+    kind: review
+    description: >-
+      The reviewer ran the tte-security-review skill over the diff: authorization, data isolation,
+      input validation, secrets, injection.
+  tests-cover-criteria:
+    stage: review
+    kind: review
+    description: Every acceptance criterion the task carries maps to at least one test.
+
+  # --- delivery --------------------------------------------------------------------------
+  pr-created:
+    stage: delivery
+    kind: evidence
+    description: A pull request exists for the task's branch and was recorded with its head commit.
+  ci-green:
+    stage: delivery
+    kind: evidence
+    description: >-
+      Every check GitHub reports on the pull request's head commit passed when it was recorded
+      (gh pr checks); a pending or failing check does not pass.
+  acceptance-verified:
+    stage: delivery
+    kind: review
+    description: Each acceptance criterion of the feature was checked against the integrated result.
+  risks-documented:
+    stage: delivery
+    kind: review
+    description: The delivery report lists every open risk and unresolved finding.
+  human-merge-approval:
+    stage: delivery
+    kind: human
+    description: >-
+      A person approves each merge. No agent merges into a protected branch; the coordinator opens
+      an Orca decision gate and stops.

@@ -1,0 +1,10 @@
+# Last matching pattern wins.
+* @theTop-AI/devs
+
+# Security rules and policy: what agents may do, read and install. A change here widens or narrows
+# every agent's permissions on every host, so it is reviewed as a security change, by a person.
+/adapters/claude-code/permissions.json  @theTop-AI/devs
+/config/harness.yaml                    @theTop-AI/devs
+/config/quality-gates.yaml              @theTop-AI/devs
+/docs/security.md                       @theTop-AI/devs
+/.github/                               @theTop-AI/devs

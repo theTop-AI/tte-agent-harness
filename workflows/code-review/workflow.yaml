@@ -1,0 +1,50 @@
+# Review an existing pull request or branch independently: findings and a recorded verdict, an
+# optional fix loop by the developer role, and a re-review. Nothing is merged.
+schema: 1
+name: code-review
+description: >-
+  An independent code and security review of an existing pull request or branch, with findings
+  recorded against the exact commit, an optional fix loop by the repository's developer role and
+  a re-review; the verdict goes to a person, who decides on the merge.
+
+stages:
+  - id: review
+    title: Independent code and security review of the branch head
+    role: code-reviewer
+    skills: [tte-code-review, tte-security-review]
+    depends_on: []
+    per_repository: true
+    gates: [scope-matches-task, security-reviewed, tests-cover-criteria]
+    outputs: [findings file, verdict recorded with tte-harness evidence review]
+
+  - id: fix-backend
+    title: Backend fixes for the review findings (optional)
+    role: backend-developer
+    skills: [python-development]
+    depends_on: [review]
+    per_repository: true
+    gates: [repo-validate, clean-commit, no-contract-change, no-secrets, review-pass]
+
+  - id: fix-frontend
+    title: Frontend fixes for the review findings (optional)
+    role: frontend-developer
+    skills: [react-development]
+    depends_on: [review]
+    per_repository: true
+    gates: [repo-validate, clean-commit, no-contract-change, no-secrets, review-pass]
+
+  - id: re-review
+    title: Re-review of the new head
+    role: code-reviewer
+    skills: [tte-code-review, tte-security-review]
+    depends_on: [fix-backend, fix-frontend]
+    per_repository: true
+    gates: [scope-matches-task, security-reviewed, tests-cover-criteria]
+
+  - id: report
+    title: Verdict and open findings for the person who decides
+    role: coordinator
+    skills: [feature-delivery]
+    depends_on: [re-review]
+    gates: [risks-documented, human-merge-approval]
+    outputs: [delivery-report.md with the verdict per repository]

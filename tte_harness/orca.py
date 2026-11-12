@@ -40,6 +40,15 @@ def resolve_cli() -> tuple[str | None, str]:
         ide = shutil.which("orca-ide")
         if ide:
             return ide, "orca-ide on PATH"
+        # Where Orca's managed server installs its CLI on an SSH host (seen on the devbox,
+        # 2026-11-12), and the folder Orca names in its terminals; neither is on a
+        # non-interactive PATH.
+        for folder in (os.environ.get("ORCA_CLI_BIN_DIR"),
+                       os.path.join(os.environ.get("HOME", ""), ".orca", "cli", "bin")):
+            if folder:
+                cand = os.path.join(folder, "orca-ide")
+                if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                    return cand, f"orca-ide in {folder}"
         bare = shutil.which("orca")
         inside = bool(os.environ.get("ORCA_TERMINAL_HANDLE") or os.environ.get("ORCA_WORKTREE_ID"))
         if bare and inside and os.path.realpath(bare) != "/usr/bin/orca":
@@ -66,6 +75,11 @@ def call(cli: str, args: list[str], timeout: float = 120) -> dict[str, Any]:
         err = data.get("error") if isinstance(data, dict) else None
         detail = (f"{err.get('code')}: {err.get('message')}" if isinstance(err, dict)
                   else (proc.stderr.strip() or text or f"exit {proc.returncode}"))
+        if isinstance(err, dict) and err.get("code") == "no_active_sender_terminal":
+            # Seen live on Orca 1.4.256: orchestration needs to know which session is calling.
+            detail += ("\n  Run this from the coordinator's own Orca terminal or chat (Orca sets "
+                       "ORCA_TERMINAL_HANDLE there), or pass --from <your own terminal handle> "
+                       "(orca terminal list --json). Nothing was created.")
         raise HarnessError(f"orca {' '.join(args[:2])} failed: {detail}")
     return data
 
@@ -121,9 +135,13 @@ def render_script(steps: list[dict[str, Any]], cli: str = "orca") -> str:
     return "\n".join(lines) + "\n"
 
 
-def create(run_dir: Path, cli: str) -> dict[str, Any]:
+def create(run_dir: Path, cli: str, sender: str | None = None) -> dict[str, Any]:
     """Create the Run, its Tasks and gates in Orca, writing orca-map.json after every call so a
-    failure part way leaves an exact record of what exists."""
+    failure part way leaves an exact record of what exists.
+
+    `sender` is the caller's own terminal handle (`--from`); without it Orca identifies the
+    caller from the Orca terminal or chat the command runs in."""
+    extra = ["--from", sender] if sender else []
     map_path = run_dir / MAP_NAME
     if map_path.is_file():
         existing = read_json(map_path)
@@ -135,7 +153,7 @@ def create(run_dir: Path, cli: str) -> dict[str, Any]:
     mapping: dict[str, Any] = {"schema": 1, "run_id": None, "tasks": {}, "gates": {},
                                "complete": False}
     for step in build_commands(run_dir):
-        args = list(step["args"])
+        args = list(step["args"]) + extra
         if step["kind"] == "run":
             res = call(cli, args)
             mapping["run_id"] = res["result"]["run"]["id"]

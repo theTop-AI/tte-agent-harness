@@ -21,6 +21,12 @@ with open(os.environ["FAKE_ORCA_LOG"], "a") as log:
 def flag(name):
     return args[args.index(name) + 1] if name in args else None
 n = sum(1 for _ in open(os.environ["FAKE_ORCA_LOG"]))
+if os.environ.get("FAKE_ORCA_REQUIRE_SENDER") and "--from" not in args \
+        and not os.environ.get("ORCA_TERMINAL_HANDLE"):
+    # What Orca 1.4.256 answered, live, outside an Orca terminal.
+    print(json.dumps({"id": "local", "ok": False, "error": {"code": "no_active_sender_terminal",
+          "message": "Could not determine the calling terminal for this orchestration command."}}))
+    sys.exit(1)
 if args[:2] == ["orchestration", "run-create"]:
     out = {"run": {"id": "run_1", "objective": flag("--objective")}}
 elif args[:2] == ["orchestration", "task-create"]:
@@ -81,6 +87,28 @@ class OrcaTest(HarnessTestCase):
         with self.assertRaisesRegex(HarnessError, "already exists in Orca"):
             orca.create(self.run, str(self.fake))
 
+    def test_an_unidentified_caller_is_explained_and_nothing_is_created(self):
+        os.environ["FAKE_ORCA_REQUIRE_SENDER"] = "1"
+        with self.assertRaisesRegex(HarnessError, "pass --from <your own terminal handle>"):
+            orca.create(self.run, str(self.fake))
+        self.assertFalse((self.run / orca.MAP_NAME).exists())
+        mapping = orca.create(self.run, str(self.fake), sender="term_coordinator")
+        self.assertTrue(mapping["complete"])
+        self.assertTrue(all(c[c.index("--from") + 1] == "term_coordinator" for c in self.calls()
+                            if "--from" in c))
+        self.assertEqual(sum("--from" in c for c in self.calls()), 5)
+
+    def test_inside_an_orca_terminal_no_sender_is_needed(self):
+        os.environ["FAKE_ORCA_REQUIRE_SENDER"] = "1"
+        os.environ["ORCA_TERMINAL_HANDLE"] = "term_here"
+        self.assertTrue(orca.create(self.run, str(self.fake))["complete"])
+
+    def test_status_before_create_explains_itself(self):
+        os.environ["ORCA_CLI_COMMAND"] = str(self.fake)
+        code, out = self.call(self.root, "status", "--run-dir", str(self.run))
+        self.assertEqual(code, 2)
+        self.assertIn("has not been created in Orca yet", out)
+
     def test_a_failure_part_way_leaves_an_exact_record(self):
         os.environ["FAKE_ORCA_FAIL_TASK"] = "3"
         with self.assertRaisesRegex(HarnessError, "boom: refused"):
@@ -125,6 +153,12 @@ class OrcaTest(HarnessTestCase):
         os.environ["PATH"] = str(bindir)
         with mock.patch.object(orca.sys, "platform", "linux"):
             self.assertIsNone(orca.resolve_cli()[0], "nothing on PATH")
+            managed = self.home / ".orca" / "cli" / "bin"
+            managed.mkdir(parents=True)
+            (managed / "orca-ide").symlink_to(self.fake)
+            self.assertEqual(orca.resolve_cli()[0], str(managed / "orca-ide"),
+                             "the managed server's CLI is found off PATH")
+            (managed / "orca-ide").unlink()
             (bindir / "orca").symlink_to(self.fake)
             self.assertIsNone(orca.resolve_cli()[0], "bare orca outside an Orca terminal is refused")
             os.environ["ORCA_TERMINAL_HANDLE"] = "term_1"

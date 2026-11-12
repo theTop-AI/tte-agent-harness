@@ -160,7 +160,7 @@ def cmd_orca(args: argparse.Namespace) -> int:
     cli, why = orca.resolve_cli()
     if not cli:
         raise HarnessError(f"no Orca CLI: {why}")
-    mapping = orca.create(run_dir, cli)
+    mapping = orca.create(run_dir, cli, args.sender)
     print(f"Run {mapping['run_id']}: {len(mapping['tasks'])} tasks, {len(mapping['gates'])} gates "
           f"-> {run_dir / orca.MAP_NAME}")
     return 0
@@ -187,8 +187,15 @@ def cmd_status(args: argparse.Namespace) -> int:
         cli, why = orca.resolve_cli()
         if not cli:
             raise HarnessError(f"no Orca CLI ({why}); pass --orca-json <saved task-list output>")
-        mapping = read_json(run_dir / orca.MAP_NAME)
-        data = orca.call(cli, ["orchestration", "task-list", "--run", mapping["run_id"]])
+        map_path = run_dir / orca.MAP_NAME
+        if not map_path.is_file():
+            raise HarnessError(f"{map_path}: this run has not been created in Orca yet "
+                               f"(tte-harness orca create --run-dir {run_dir})")
+        mapping = read_json(map_path)
+        call_args = ["orchestration", "task-list", "--run", mapping["run_id"]]
+        if args.sender:
+            call_args += ["--from", args.sender]
+        data = orca.call(cli, call_args)
     tasks = (data.get("result") or {}).get("tasks") or []
     flags = {t["id"]: _evidence_flags(h, run_dir, t) for t in info["tasks"]}
     states = orca.lifecycle(run_dir, tasks, flags)
@@ -299,11 +306,15 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("commands", "create"):
         x = osub.add_parser(name)
         x.add_argument("--run-dir")
+        if name == "create":
+            x.add_argument("--from", dest="sender",
+                           help="your own Orca terminal handle, when not run inside one")
     o.set_defaults(func=cmd_orca)
 
     st = sub.add_parser("status", help="lifecycle state of every task, from Orca and evidence")
     st.add_argument("--run-dir")
     st.add_argument("--orca-json", help="a saved `orca orchestration task-list --json --full`")
+    st.add_argument("--from", dest="sender", help="your own Orca terminal handle")
     st.set_defaults(func=cmd_status)
 
     e = sub.add_parser("evidence", help="record and check task evidence")

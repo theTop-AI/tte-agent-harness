@@ -67,6 +67,8 @@ make_repo() {
 }
 JSON
   sed -i.bak "s/REPO/$1/" "$dir/.claude/project.json" && rm "$dir/.claude/project.json.bak"
+  # The generated script must keep "$f" literal, so single quotes are intended here.
+  # shellcheck disable=SC2016
   printf '#!/bin/sh\n# every file under src/ must be non-empty\nfor f in src/*; do test -s "$f" || exit 1; done\n' >"$dir/tests/run.sh"
   echo "existing code" >"$dir/src/app.txt"
   git -C "$dir" init -q -b main
